@@ -4,9 +4,9 @@ import random
 import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QFileDialog, 
-                             QListWidget, QSlider, QListWidgetItem)
+                             QListWidget, QSlider, QListWidgetItem, QMenu)
 from PyQt6.QtCore import Qt, QRect, QPointF, QTimer, QUrl, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QFont, QFontMetrics
+from PyQt6.QtGui import QAction, QPainter, QColor, QLinearGradient, QPen, QFont, QFontMetrics
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".turka_music_config.json")
@@ -14,11 +14,15 @@ SUPPORTED_FORMATS = ('.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '
 
 class DragDropList(QListWidget):
     fileDropped = pyqtSignal(list)
+    deleteRequested = pyqtSignal()
+    clearRequested = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
-        # Alt kaydırma çubuğunu tamamen kapatıyoruz
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls(): event.accept()
@@ -31,6 +35,23 @@ class DragDropList(QListWidget):
     def dropEvent(self, event):
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         self.fileDropped.emit(files)
+
+    def show_context_menu(self, position):
+        menu = QMenu(self)
+        # Menü stilini ana temaya uyduralım
+        menu.setStyleSheet("QMenu { background-color: #2c3e50; color: white; border: 1px solid #7f8c8d; } QMenu::item:selected { background-color: #34495e; }")
+        
+        remove_action = QAction("Parçayı Sil", self)
+        remove_action.triggered.connect(lambda: self.deleteRequested.emit())
+        
+        clear_action = QAction("Tümünü Sil", self)
+        clear_action.triggered.connect(lambda: self.clearRequested.emit())
+
+        if self.itemAt(position):
+            menu.addAction(remove_action)
+        
+        menu.addAction(clear_action)
+        menu.exec(self.mapToGlobal(position))
 
 class ScrollingLabel(QWidget):
     def __init__(self, text="", parent=None):
@@ -162,7 +183,6 @@ class TurkaPlayer(QMainWindow):
         self.setStyleSheet(bg_style)
         self.findChild(QFrame, "LCDContainer").setStyleSheet(f"background: #000; border-radius: 12px; border: 3px solid {lcd_border};")
         
-        # Modern Scrollbar ve Liste Tasarımı
         scrollbar_style = f"""
         QScrollBar:vertical {{ background: {scroll_bg}; width: 8px; margin: 0px; border-radius: 4px; }}
         QScrollBar::handle:vertical {{ background: {color}; min-height: 20px; border-radius: 4px; }}
@@ -198,6 +218,19 @@ class TurkaPlayer(QMainWindow):
         self.progress_bar.sliderMoved.connect(self.player.setPosition); self.player.playbackStateChanged.connect(self.apply_theme_styles)
         self.player.mediaStatusChanged.connect(lambda s: self.next_track() if s == QMediaPlayer.MediaStatus.EndOfMedia else None)
         self.list.fileDropped.connect(self.handle_dropped_files)
+        # Sağ tık silme bağlantıları
+        self.list.deleteRequested.connect(self.remove_selected_item)
+        self.list.clearRequested.connect(self.clear_playlist)
+
+    def remove_selected_item(self):
+        current_row = self.list.currentRow()
+        if current_row >= 0:
+            self.list.takeItem(current_row)
+            self.save_settings()
+
+    def clear_playlist(self):
+        self.list.clear()
+        self.save_settings()
 
     def handle_dropped_files(self, paths):
         for path in paths:
@@ -237,12 +270,18 @@ class TurkaPlayer(QMainWindow):
             except: pass
 
     def play_file(self, item):
+        if not item: return
         path = item.data(Qt.ItemDataRole.UserRole)
         if path: self.player.setSource(QUrl.fromLocalFile(path)); self.player.play(); self.title_lbl.setText(os.path.basename(path))
 
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState: self.player.pause()
-        else: self.player.play()
+        else:
+            if not self.player.source().isValid() and self.list.count() > 0:
+                if self.list.currentRow() < 0: self.list.setCurrentRow(0)
+                self.play_file(self.list.currentItem())
+            else:
+                self.player.play()
 
     def next_track(self):
         r = self.list.currentRow() + 1
