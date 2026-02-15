@@ -143,7 +143,6 @@ class TurkaPlayer(QMainWindow):
         self.player = QMediaPlayer(); self.audio = QAudioOutput(); self.player.setAudioOutput(self.audio)
         self.is_dark_mode = True; self.is_shuffled = False; self.is_repeated = False; self.is_list_visible = True
         
-        # Tam 20 adet seçilmiş tema rengi
         self.themes = [
             "#00e676", "#00b0ff", "#ff3d00", "#d4af37", "#bd93f9", 
             "#ff79c6", "#8be9fd", "#50fa7b", "#ffb86c", "#ff5555", 
@@ -211,6 +210,16 @@ class TurkaPlayer(QMainWindow):
         self.is_dark_mode = not self.is_dark_mode
         self.btn_mode.setText("☾" if self.is_dark_mode else "☼"); self.apply_theme_styles(); self.save_settings()
 
+    def toggle_shuffle(self): 
+        self.is_shuffled = not self.is_shuffled
+        self.apply_theme_styles()
+        self.save_settings()
+
+    def toggle_repeat(self): 
+        self.is_repeated = not self.is_repeated
+        self.apply_theme_styles()
+        self.save_settings()
+
     def apply_theme_styles(self):
         color = self.themes[self.current_theme_idx]; qcolor = QColor(color)
         self.knob.is_dark = self.is_dark_mode; self.knob.color = qcolor; self.vumeter.color = qcolor
@@ -228,45 +237,23 @@ class TurkaPlayer(QMainWindow):
         panel_style = f"QFrame#VolumePanel, QFrame#NavPanel {{ background-color: {panel_bg}; border-radius: 20px; border: 1px solid {shadow_light if self.is_dark_mode else '#ffffff'}; border-bottom: 5px solid {shadow_dark}; border-right: 2px solid {shadow_dark}; }} QFrame#LCDContainer {{ background-color: #000; border-radius: 15px; border: 4px solid {color}; }}"
         self.centralWidget().setStyleSheet(panel_style)
         
-        btn_style = f"QPushButton {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, {btn_grad}); border-radius: %RAD%px; border: 1px solid {shadow_light}; color: {text_color}; font-weight: bold; border-bottom: 4px solid {shadow_dark}; }} QPushButton:hover {{ border: 2px solid {color}; }} QPushButton:pressed {{ border-bottom: 1px solid {shadow_dark}; margin-top: 3px; }}"
-        for b in [self.btn_vol_down, self.btn_vol_up, self.btn_back5, self.btn_prev, self.btn_next, self.btn_fwd5]: b.setStyleSheet(btn_style.replace("%RAD%", "19"))
-        self.btn_play.setStyleSheet(btn_style.replace("%RAD%", "32"))
-        rect_style = btn_style.replace("%RAD%", "8")
-        for b in [self.btn_add, self.btn_theme, self.btn_mode, self.btn_list_toggle, self.btn_shuffle, self.btn_repeat]: b.setStyleSheet(rect_style)
+        btn_base = f"QPushButton {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, {btn_grad}); border: 1px solid {shadow_light}; color: {text_color}; font-weight: bold; border-bottom: 4px solid {shadow_dark}; }} QPushButton:hover {{ border: 2px solid {color}; }} QPushButton:pressed {{ border-bottom: 1px solid {shadow_dark}; margin-top: 3px; }}"
         
-        if self.is_shuffled: self.btn_shuffle.setStyleSheet(rect_style + f"border: 2px solid {color}; color: {color};")
-        if self.is_repeated: self.btn_repeat.setStyleSheet(rect_style + f"border: 2px solid {color}; color: {color};")
+        for b in [self.btn_vol_down, self.btn_vol_up, self.btn_back5, self.btn_prev, self.btn_next, self.btn_fwd5]: 
+            b.setStyleSheet(btn_base.replace("QPushButton {", "QPushButton { border-radius: 19px;"))
+        self.btn_play.setStyleSheet(btn_base.replace("QPushButton {", "QPushButton { border-radius: 32px;"))
+        
+        rect_base = btn_base.replace("QPushButton {", "QPushButton { border-radius: 8px;")
+        for b in [self.btn_add, self.btn_theme, self.btn_mode, self.btn_list_toggle, self.btn_shuffle, self.btn_repeat]:
+            b.setStyleSheet(rect_base)
+        
+        # Karıştır ve Tekrarla aktif durum görselleştirmesi
+        active_css = f"QPushButton {{ border: 2px solid {color}; color: {color}; border-bottom: 2px solid {shadow_dark}; }}"
+        if self.is_shuffled: self.btn_shuffle.setStyleSheet(rect_base + active_css)
+        if self.is_repeated: self.btn_repeat.setStyleSheet(rect_base + active_css)
         
         self.search_bar.setStyleSheet(f"background: {panel_bg}; color: {text_color}; border: 2px solid {shadow_dark}; border-radius: 10px; padding: 5px;")
-        
-        self.list.setStyleSheet(f"""
-            QListWidget {{
-                background: {panel_bg};
-                color: {text_color};
-                border-radius: 15px;
-                border: 2px solid {shadow_dark};
-                selection-background-color: {color};
-                padding: 5px;
-            }}
-            QScrollBar:vertical {{
-                border: none;
-                background: transparent;
-                width: 8px;
-                margin: 0px 0px 0px 0px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {scroll_color};
-                min-height: 20px;
-                border-radius: 4px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical, QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-                height: 0px; width: 0px;
-            }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical, QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
-                background: transparent;
-            }}
-        """)
-        
+        self.list.setStyleSheet(f"QListWidget {{ background: {panel_bg}; color: {text_color}; border-radius: 15px; border: 2px solid {shadow_dark}; selection-background-color: {color}; padding: 5px; }} QScrollBar:vertical {{ border: none; background: transparent; width: 8px; }} QScrollBar::handle:vertical {{ background: {scroll_color}; border-radius: 4px; }} QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}")
         self.progress_bar.setStyleSheet(f"QSlider::groove:horizontal {{ background: #111; height: 6px; border-radius: 3px; }} QSlider::handle:horizontal {{ background: {color}; width: 16px; margin: -5px 0; border-radius: 8px; border: 1px solid #000; }}")
         self.time_lbl.setStyleSheet(f"color: {color}; font-family: 'Monospace'; font-size: 13px; font-weight: bold;")
 
@@ -286,8 +273,6 @@ class TurkaPlayer(QMainWindow):
     def filter_playlist(self, text):
         for i in range(self.list.count()): item = self.list.item(i); item.setHidden(text.lower() not in item.text().lower())
 
-    def toggle_shuffle(self): self.is_shuffled = not self.is_shuffled; self.apply_theme_styles(); self.save_settings()
-    def toggle_repeat(self): self.is_repeated = not self.is_repeated; self.apply_theme_styles(); self.save_settings()
     def handle_media_end(self, status):
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             if self.is_repeated: self.player.play()
@@ -316,7 +301,6 @@ class TurkaPlayer(QMainWindow):
         self.save_settings()
 
     def change_theme(self): 
-        # 20 tema arasında döngü yapar
         self.current_theme_idx = (self.current_theme_idx + 1) % len(self.themes)
         self.apply_theme_styles()
         self.save_settings()
@@ -334,12 +318,16 @@ class TurkaPlayer(QMainWindow):
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState: self.player.pause()
         else:
             if not self.player.source().isValid() and self.list.count() > 0:
-                self.list.setCurrentRow(0); self.play_file(self.list.currentItem())
+                if self.list.currentRow() < 0: self.list.setCurrentRow(0)
+                self.play_file(self.list.currentItem())
             else: self.player.play()
 
     def next_track(self):
         if self.list.count() == 0: return
-        idx = random.randint(0, self.list.count() - 1) if self.is_shuffled else (self.list.currentRow() + 1) % self.list.count()
+        if self.is_shuffled:
+            idx = random.randint(0, self.list.count() - 1)
+        else:
+            idx = (self.list.currentRow() + 1) % self.list.count()
         self.list.setCurrentRow(idx); self.play_file(self.list.currentItem())
 
     def prev_track(self):
