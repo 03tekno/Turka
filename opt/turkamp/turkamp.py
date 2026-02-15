@@ -4,13 +4,16 @@ import random
 import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QFileDialog, 
-                             QListWidget, QSlider, QListWidgetItem, QMenu, QLineEdit) # QLineEdit eklendi
+                             QListWidget, QSlider, QListWidgetItem, QMenu, QLineEdit)
 from PyQt6.QtCore import Qt, QRect, QPointF, QTimer, QUrl, pyqtSignal
-from PyQt6.QtGui import QAction, QPainter, QColor, QLinearGradient, QPen, QFont, QFontMetrics
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtGui import QAction, QPainter, QColor, QLinearGradient, QPen, QFont, QFontMetrics, QIcon, QGuiApplication
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".turka_music_config.json")
 SUPPORTED_FORMATS = ('.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wma', '.m4b', '.aiff', '.mid', '.amr')
+
+# --- SİMGE AYARI ---
+ICON_NAME = "turkamp.png" 
+# -------------------
 
 class DragDropList(QListWidget):
     fileDropped = pyqtSignal(list)
@@ -120,9 +123,19 @@ class ModernSpectrum(QWidget):
             painter.setBrush(grad); painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(int(i*w), self.height()-h, int(w-2), h)
 
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+
 class TurkaPlayer(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle("Turka Music Player")
+        super().__init__()
+        self.setWindowTitle("Turka Music Player")
+        
+        # --- PANEL SİMGESİ İÇİN EKLEME ---
+        icon_path = os.path.join(os.path.dirname(__file__), ICON_NAME)
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        # ----------------------------------
+
         self.player = QMediaPlayer(); self.audio = QAudioOutput(); self.player.setAudioOutput(self.audio)
         self.is_dark_mode = True
         self.is_shuffled = False
@@ -158,7 +171,6 @@ class TurkaPlayer(QMainWindow):
         top_btn_layout.addWidget(self.btn_theme)
         layout.addLayout(top_btn_layout)
 
-        # Arama Çubuğu Eklendi
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Parçalarda ara...")
         self.search_bar.setFixedHeight(30)
@@ -238,7 +250,6 @@ class TurkaPlayer(QMainWindow):
         self.player.mediaStatusChanged.connect(self.handle_media_end)
         self.list.fileDropped.connect(self.handle_dropped_files)
         self.list.deleteRequested.connect(self.remove_selected_item); self.list.clearRequested.connect(self.clear_playlist)
-        # Arama fonksiyonu bağlandı
         self.search_bar.textChanged.connect(self.filter_playlist)
 
     def filter_playlist(self, text):
@@ -293,7 +304,6 @@ class TurkaPlayer(QMainWindow):
 
     def next_track(self):
         if self.list.count() == 0: return
-        # Sadece görünür (filtrelenmemiş) parçalar arasından seçim yapmak için mantık eklenebilir ancak basitlik için mevcut mantık korundu.
         if self.is_shuffled: idx = random.randint(0, self.list.count() - 1)
         else: idx = (self.list.currentRow() + 1) % self.list.count()
         self.list.setCurrentRow(idx); self.play_file(self.list.currentItem())
@@ -330,4 +340,13 @@ class TurkaPlayer(QMainWindow):
     def closeEvent(self, event): self.save_settings(); event.accept()
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv); app.setStyle("Fusion"); ex = TurkaPlayer(); ex.show(); sys.exit(app.exec())
+    app = QApplication(sys.argv)
+    
+    # --- LINUX İÇİN MASAÜSTÜ KİMLİĞİ ---
+    QGuiApplication.setDesktopFileName("turkamp.desktop")
+    # ------------------------------------
+
+    app.setStyle("Fusion")
+    ex = TurkaPlayer()
+    ex.show()
+    sys.exit(app.exec())
