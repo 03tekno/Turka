@@ -4,7 +4,7 @@ import random
 import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QFileDialog, 
-                             QListWidget, QSlider, QListWidgetItem, QMenu)
+                             QListWidget, QSlider, QListWidgetItem, QMenu, QLineEdit) # QLineEdit eklendi
 from PyQt6.QtCore import Qt, QRect, QPointF, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QAction, QPainter, QColor, QLinearGradient, QPen, QFont, QFontMetrics
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -142,11 +142,10 @@ class TurkaPlayer(QMainWindow):
         lcd_lyt.addWidget(self.time_lbl); self.progress_bar = QSlider(Qt.Orientation.Horizontal); lcd_lyt.addWidget(self.progress_bar)
         layout.addWidget(lcd)
 
-        # Üst Kontroller - Yeni Sıralama: Liste | Karıştır | Mod | Tekrarla | Tema
         top_btn_layout = QHBoxLayout()
         self.btn_add = self.create_rect_btn("Liste +", 75, 30)
         self.btn_shuffle = self.create_rect_btn("Karıştır", 70, 30)
-        self.btn_mode = self.create_rect_btn("☾", 40, 30) # Açık/Koyu Mod Ortada
+        self.btn_mode = self.create_rect_btn("☾", 40, 30)
         self.btn_repeat = self.create_rect_btn("Tekrarla", 70, 30)
         self.btn_theme = self.create_rect_btn("Tema", 65, 30)
         
@@ -158,6 +157,12 @@ class TurkaPlayer(QMainWindow):
         top_btn_layout.addStretch()
         top_btn_layout.addWidget(self.btn_theme)
         layout.addLayout(top_btn_layout)
+
+        # Arama Çubuğu Eklendi
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("Parçalarda ara...")
+        self.search_bar.setFixedHeight(30)
+        layout.addWidget(self.search_bar)
 
         self.list = DragDropList(); layout.addWidget(self.list, stretch=5)
         
@@ -190,13 +195,16 @@ class TurkaPlayer(QMainWindow):
             bg_style = "QMainWindow { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2c3e50, stop:0.5 #1a1a1a, stop:1 #000000); }"
             lcd_border = "#34495e"; list_bg = "#121212"; list_text = "#eceff1"; btn_grad = "stop:0 #455a64, stop:1 #263238"; btn_text = "#ffffff"
             scroll_handle_color = "#FFFFFF"; scroll_bg_color = "#1e1e1e"
+            search_style = f"QLineEdit {{ background: #1a1a1a; color: white; border: 1px solid {lcd_border}; border-radius: 6px; padding-left: 8px; }}"
         else:
             bg_style = "QMainWindow { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #cfd8dc, stop:0.5 #ffffff, stop:1 #b0bec5); }"
             lcd_border = "#78909c"; list_bg = "#fdfdfd"; list_text = "#2d3436"; btn_grad = "stop:0 #eceff1, stop:1 #cfd8dc"; btn_text = "#37474f"
             scroll_handle_color = "#000000"; scroll_bg_color = "#e0e0e0"
+            search_style = f"QLineEdit {{ background: #ffffff; color: black; border: 1px solid {lcd_border}; border-radius: 6px; padding-left: 8px; }}"
 
         self.setStyleSheet(bg_style)
         self.findChild(QFrame, "LCDContainer").setStyleSheet(f"background: #000; border-radius: 12px; border: 3px solid {lcd_border};")
+        self.search_bar.setStyleSheet(search_style)
         
         scrollbar_style = f"QScrollBar:vertical {{ background: {scroll_bg_color}; width: 10px; margin: 0px; border-radius: 5px; }} QScrollBar::handle:vertical {{ background: {scroll_handle_color}; min-height: 20px; border-radius: 5px; }} QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}"
         
@@ -230,6 +238,13 @@ class TurkaPlayer(QMainWindow):
         self.player.mediaStatusChanged.connect(self.handle_media_end)
         self.list.fileDropped.connect(self.handle_dropped_files)
         self.list.deleteRequested.connect(self.remove_selected_item); self.list.clearRequested.connect(self.clear_playlist)
+        # Arama fonksiyonu bağlandı
+        self.search_bar.textChanged.connect(self.filter_playlist)
+
+    def filter_playlist(self, text):
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            item.setHidden(text.lower() not in item.text().lower())
 
     def toggle_shuffle(self): self.is_shuffled = not self.is_shuffled; self.apply_theme_styles()
     def toggle_repeat(self): self.is_repeated = not self.is_repeated; self.apply_theme_styles()
@@ -278,6 +293,7 @@ class TurkaPlayer(QMainWindow):
 
     def next_track(self):
         if self.list.count() == 0: return
+        # Sadece görünür (filtrelenmemiş) parçalar arasından seçim yapmak için mantık eklenebilir ancak basitlik için mevcut mantık korundu.
         if self.is_shuffled: idx = random.randint(0, self.list.count() - 1)
         else: idx = (self.list.currentRow() + 1) % self.list.count()
         self.list.setCurrentRow(idx); self.play_file(self.list.currentItem())
