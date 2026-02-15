@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt, QRect, QPointF, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QAction, QPainter, QColor, QLinearGradient, QPen, QFont, QFontMetrics, QIcon, QGuiApplication
 
-CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".turka_music_config.json")
+CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".turkamp_config.json")
 SUPPORTED_FORMATS = ('.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wma', '.m4b', '.aiff', '.mid', '.amr')
 
 # --- SİMGE AYARI ---
