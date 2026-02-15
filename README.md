@@ -6,4 +6,6 @@ Python ve Qt6 ile yazılmış basit ve hafif müzik çalar uygulamadır.
 
 Debian tabanlı sistemler için .deb dosyası download link: https://github.com/03tekno/TurkaMP/releases/tag/current
 
-![screenshot](turka1.png "screenshot")
+![screenshot](turkamp1.png "screenshot")
+![screenshot](turkamp2.png "screenshot")
+
