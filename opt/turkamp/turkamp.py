@@ -156,7 +156,7 @@ class TurkaPlayer(QMainWindow):
         layout.addWidget(lcd)
 
         top_btn_layout = QHBoxLayout()
-        self.btn_add = self.create_rect_btn("Liste +", 75, 30)
+        self.btn_add = self.create_rect_btn("Ekle +", 75, 30)
         self.btn_shuffle = self.create_rect_btn("Karıştır", 70, 30)
         self.btn_mode = self.create_rect_btn("☾", 40, 30)
         self.btn_repeat = self.create_rect_btn("Tekrarla", 70, 30)
