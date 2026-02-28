@@ -141,7 +141,8 @@ class TurkaPlayer(QMainWindow):
         if os.path.exists(icon_path): self.setWindowIcon(QIcon(icon_path))
 
         self.player = QMediaPlayer(); self.audio = QAudioOutput(); self.player.setAudioOutput(self.audio)
-        self.is_dark_mode = True; self.is_shuffled = False; self.is_repeated = False; self.is_list_visible = True
+        self.is_dark_mode = True; self.is_shuffled = False; self.is_repeated = False; 
+        self.is_list_visible = False # İsteğe göre başlangıçta kapalı
         
         self.themes = [
             "#00e676", "#00b0ff", "#ff3d00", "#d4af37", "#bd93f9", 
@@ -151,26 +152,39 @@ class TurkaPlayer(QMainWindow):
         ]
         self.current_theme_idx = 0
         
-        self.expanded_height = 800; self.collapsed_height = 520; self.setFixedWidth(430) 
-        self.setFixedHeight(self.expanded_height)
-        self.init_ui(); self.setup_logic(); self.load_settings(); self.apply_theme_styles()
+        self.collapsed_width = 440; self.expanded_width = 850
+        self.player_height = 520
+        
+        self.init_ui(); self.setup_logic(); self.load_settings(); 
+        
+        # İlk açılış zorlaması: Liste kapalı gelsin
+        self.is_list_visible = False
+        self.toggle_list(force=False) 
+        self.apply_theme_styles()
 
     def init_ui(self):
-        main = QWidget(); self.setCentralWidget(main); self.layout_main = QVBoxLayout(main)
-        self.layout_main.setContentsMargins(15, 15, 15, 15); self.layout_main.setSpacing(10)
-        
+        main_widget = QWidget(); self.setCentralWidget(main_widget)
+        # Ana yerleşim artık yatay (Horizontal)
+        self.layout_horizontal = QHBoxLayout(main_widget)
+        self.layout_horizontal.setContentsMargins(15, 15, 15, 15); self.layout_horizontal.setSpacing(15)
+
+        # --- SOL TARAF: KONTROL PANELİ ---
+        self.left_panel = QWidget(); self.layout_left = QVBoxLayout(self.left_panel)
+        self.layout_left.setContentsMargins(0, 0, 0, 0); self.layout_left.setSpacing(10)
+        self.left_panel.setFixedWidth(400)
+
         self.lcd_container = QFrame(); self.lcd_container.setObjectName("LCDContainer"); self.lcd_container.setFixedHeight(180) 
         lcd_lyt = QVBoxLayout(self.lcd_container); lcd_lyt.setContentsMargins(12, 10, 12, 10)
         self.title_lbl = ScrollingLabel("Turka Music Player - Hazır"); lcd_lyt.addWidget(self.title_lbl)
         self.vumeter = ModernSpectrum(self.player); lcd_lyt.addWidget(self.vumeter)
-        self.layout_main.addWidget(self.lcd_container)
+        self.layout_left.addWidget(self.lcd_container)
 
         self.progress_container = QWidget()
         prog_lyt = QVBoxLayout(self.progress_container); prog_lyt.setContentsMargins(5, 0, 5, 0); prog_lyt.setSpacing(2)
         self.time_lbl = QLabel("00:00 / 00:00"); self.time_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.progress_bar = QSlider(Qt.Orientation.Horizontal)
         prog_lyt.addWidget(self.time_lbl); prog_lyt.addWidget(self.progress_bar)
-        self.layout_main.addWidget(self.progress_container)
+        self.layout_left.addWidget(self.progress_container)
 
         self.top_btn_container = QWidget()
         top_btn_layout = QHBoxLayout(self.top_btn_container); top_btn_layout.setContentsMargins(0, 0, 0, 0); top_btn_layout.setSpacing(8) 
@@ -178,32 +192,45 @@ class TurkaPlayer(QMainWindow):
         self.btn_shuffle = self.create_rect_btn("Rastgele", 65, 30); self.btn_repeat = self.create_rect_btn("Tekrarla", 65, 30)
         self.btn_theme = self.create_rect_btn("Tema", 60, 30); self.btn_mode = self.create_rect_btn("☾", 35, 30) 
         for b in [self.btn_add, self.btn_list_toggle, self.btn_shuffle, self.btn_repeat, self.btn_theme, self.btn_mode]: top_btn_layout.addWidget(b)
-        self.layout_main.addWidget(self.top_btn_container)
+        self.layout_left.addWidget(self.top_btn_container)
 
-        self.search_bar = QLineEdit(); self.search_bar.setPlaceholderText("Parçalarda ara..."); self.search_bar.setFixedHeight(35)
-        self.layout_main.addWidget(self.search_bar)
-        self.list = DragDropList(); self.layout_main.addWidget(self.list, stretch=1)
-        
         self.volume_container = QFrame(); self.volume_container.setObjectName("VolumePanel"); self.volume_container.setFixedHeight(130)
         volume_layout = QHBoxLayout(self.volume_container); volume_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.btn_vol_down = self.create_circle_btn("-", 38); self.knob = ProVolumeKnob(); self.btn_vol_up = self.create_circle_btn("+", 38)
         volume_layout.addWidget(self.btn_vol_down); volume_layout.addWidget(self.knob); volume_layout.addWidget(self.btn_vol_up)
-        self.layout_main.addWidget(self.volume_container)
+        self.layout_left.addWidget(self.volume_container)
         
         self.nav_container = QFrame(); self.nav_container.setObjectName("NavPanel"); self.nav_container.setFixedHeight(85)
         nav_layout = QHBoxLayout(self.nav_container); nav_layout.setSpacing(12); nav_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.btn_back5 = self.create_circle_btn("⟲", 38); self.btn_prev = self.create_circle_btn("◀", 48); self.btn_play = self.create_circle_btn("▶", 65)
         self.btn_next = self.create_circle_btn("▶", 48); self.btn_fwd5 = self.create_circle_btn("⟳", 38)
         for b in [self.btn_back5, self.btn_prev, self.btn_play, self.btn_next, self.btn_fwd5]: nav_layout.addWidget(b)
-        self.layout_main.addWidget(self.nav_container)
+        self.layout_left.addWidget(self.nav_container)
+
+        self.layout_horizontal.addWidget(self.left_panel)
+
+        # --- SAĞ TARAF: PLAYLIST PANELİ ---
+        self.right_panel = QWidget(); self.layout_right = QVBoxLayout(self.right_panel)
+        self.layout_right.setContentsMargins(0, 0, 0, 0); self.layout_right.setSpacing(10)
+        
+        self.search_bar = QLineEdit(); self.search_bar.setPlaceholderText("Parçalarda ara..."); self.search_bar.setFixedHeight(35)
+        self.list = DragDropList()
+        
+        self.layout_right.addWidget(self.search_bar)
+        self.layout_right.addWidget(self.list)
+        
+        self.layout_horizontal.addWidget(self.right_panel)
 
     def create_circle_btn(self, text, size): btn = QPushButton(text); btn.setFixedSize(size, size); return btn
     def create_rect_btn(self, text, w, h): btn = QPushButton(text); btn.setFixedSize(w, h); return btn
 
-    def toggle_list(self):
-        self.is_list_visible = not self.is_list_visible
-        self.search_bar.setVisible(self.is_list_visible); self.list.setVisible(self.is_list_visible)
-        self.setFixedHeight(self.expanded_height if self.is_list_visible else self.collapsed_height)
+    def toggle_list(self, force=None):
+        if force is not None: self.is_list_visible = force
+        else: self.is_list_visible = not self.is_list_visible
+        
+        self.right_panel.setVisible(self.is_list_visible)
+        new_width = self.expanded_width if self.is_list_visible else self.collapsed_width
+        self.setFixedSize(new_width, self.player_height)
         self.apply_theme_styles()
 
     def toggle_mode(self):
@@ -212,13 +239,11 @@ class TurkaPlayer(QMainWindow):
 
     def toggle_shuffle(self): 
         self.is_shuffled = not self.is_shuffled
-        self.apply_theme_styles()
-        self.save_settings()
+        self.apply_theme_styles(); self.save_settings()
 
     def toggle_repeat(self): 
         self.is_repeated = not self.is_repeated
-        self.apply_theme_styles()
-        self.save_settings()
+        self.apply_theme_styles(); self.save_settings()
 
     def apply_theme_styles(self):
         color = self.themes[self.current_theme_idx]; qcolor = QColor(color)
@@ -234,12 +259,9 @@ class TurkaPlayer(QMainWindow):
             scroll_color = "#000000"
 
         self.setStyleSheet(bg_style)
-        # Paneller gölgeli ve sabit (basılma hareketi yok)
         panel_style = f"QFrame#VolumePanel, QFrame#NavPanel {{ background-color: {panel_bg}; border-radius: 20px; border: 1px solid {shadow_light if self.is_dark_mode else '#ffffff'}; border-bottom: 5px solid {shadow_dark}; border-right: 2px solid {shadow_dark}; }} QFrame#LCDContainer {{ background-color: #000; border-radius: 15px; border: 4px solid {color}; }}"
         self.centralWidget().setStyleSheet(panel_style)
         
-        # Butonlar: Gölgeli ama 'pressed' durumunda hareket etmez (sabit)
-        # Sadece renk değişimi (hover ve pressed) ile basıldığını belli eder
         btn_base = f"QPushButton {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, {btn_grad}); border: 1px solid {shadow_light}; color: {text_color}; font-weight: bold; border-bottom: 4px solid {shadow_dark}; outline: none; }} QPushButton:hover {{ border-color: {color}; }} QPushButton:pressed {{ background: {shadow_dark if self.is_dark_mode else shadow_dark}; border-bottom: 4px solid {shadow_dark}; }}"
         
         for b in [self.btn_vol_down, self.btn_vol_up, self.btn_back5, self.btn_prev, self.btn_next, self.btn_fwd5]: 
@@ -262,7 +284,7 @@ class TurkaPlayer(QMainWindow):
 
     def setup_logic(self):
         self.btn_add.clicked.connect(self.manual_add); self.btn_theme.clicked.connect(self.change_theme); self.btn_mode.clicked.connect(self.toggle_mode)
-        self.btn_list_toggle.clicked.connect(self.toggle_list); self.btn_shuffle.clicked.connect(self.toggle_shuffle); self.btn_repeat.clicked.connect(self.toggle_repeat)
+        self.btn_list_toggle.clicked.connect(lambda: self.toggle_list()); self.btn_shuffle.clicked.connect(self.toggle_shuffle); self.btn_repeat.clicked.connect(self.toggle_repeat)
         self.btn_vol_up.clicked.connect(lambda: self.change_volume(5)); self.btn_vol_down.clicked.connect(lambda: self.change_volume(-5))
         self.list.itemDoubleClicked.connect(self.play_file); self.btn_play.clicked.connect(self.toggle_play)
         self.btn_next.clicked.connect(self.next_track); self.btn_prev.clicked.connect(self.prev_track)
@@ -305,8 +327,7 @@ class TurkaPlayer(QMainWindow):
 
     def change_theme(self): 
         self.current_theme_idx = (self.current_theme_idx + 1) % len(self.themes)
-        self.apply_theme_styles()
-        self.save_settings()
+        self.apply_theme_styles(); self.save_settings()
 
     def add_to_list(self, path): 
         item = QListWidgetItem(os.path.basename(path)); item.setData(Qt.ItemDataRole.UserRole, path); self.list.addItem(item)
@@ -327,10 +348,8 @@ class TurkaPlayer(QMainWindow):
 
     def next_track(self):
         if self.list.count() == 0: return
-        if self.is_shuffled:
-            idx = random.randint(0, self.list.count() - 1)
-        else:
-            idx = (self.list.currentRow() + 1) % self.list.count()
+        if self.is_shuffled: idx = random.randint(0, self.list.count() - 1)
+        else: idx = (self.list.currentRow() + 1) % self.list.count()
         self.list.setCurrentRow(idx); self.play_file(self.list.currentItem())
 
     def prev_track(self):
